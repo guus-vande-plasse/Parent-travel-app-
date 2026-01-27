@@ -45,10 +45,13 @@ const state = {
     userLocation: null,
     userMarker: null,
     isochroneLayer: null,
+    isochroneFeature: null, // Store for filtering
     destinationMarkers: [],
+    currentDestinations: [], // Store fetched destinations
     selectedDestination: null,
     driveTimeMinutes: 120, // Default 2 hours
-    activeFilters: new Set(['theme_park', 'beach', 'nature', 'museum', 'zoo', 'historic'])
+    activeFilters: new Set(['theme_park', 'beach', 'nature', 'museum', 'zoo', 'historic']),
+    isLoading: false
 };
 
 // =============================================================================
@@ -307,10 +310,6 @@ function displayIsochrone(isochroneFeature) {
 // Destination Management
 // =============================================================================
 
-function filterDestinations() {
-    return DESTINATIONS.filter(dest => state.activeFilters.has(dest.type));
-}
-
 function isPointInIsochrone(lat, lng, isochroneFeature) {
     if (!isochroneFeature) return false;
 
@@ -351,12 +350,13 @@ function calculateDriveTime(from, to) {
     return Math.round(timeHours * 60); // Return minutes
 }
 
-function displayDestinations(isochroneFeature) {
+function displayDestinations(isochroneFeature, destinations = []) {
     // Clear existing markers
     state.destinationMarkers.forEach(marker => state.map.removeLayer(marker));
     state.destinationMarkers = [];
 
-    const filteredDestinations = filterDestinations();
+    // Filter by active categories
+    const filteredDestinations = destinations.filter(dest => state.activeFilters.has(dest.type));
     const reachableDestinations = [];
 
     filteredDestinations.forEach(dest => {
@@ -401,16 +401,18 @@ function displayDestinations(isochroneFeature) {
 
 function createPopupContent(dest) {
     const typeInfo = DESTINATION_TYPES[dest.type];
-    const driveTimeStr = formatDriveTime(dest.driveTime);
-    const stars = '⭐'.repeat(dest.kidFriendlyRating);
+    const driveTimeStr = dest.driveTime ? formatDriveTime(dest.driveTime) : 'Unknown';
+    const stars = '⭐'.repeat(Math.min(dest.kidFriendlyRating || 3, 5));
+    const cityDisplay = dest.city || 'Location';
+    const description = dest.description || 'Click to learn more about this destination.';
 
     return `
-        <div class="popup-content">
+        <div class="popup-content" data-xid="${dest.xid || ''}">
             <h3>${dest.imageEmoji} ${dest.name}</h3>
-            <p>${dest.city}</p>
+            <p>${cityDisplay}</p>
             <p class="drive-time">🚗 ${driveTimeStr} drive</p>
-            <p>${stars} (Ages ${dest.ageRange})</p>
-            <p style="font-size: 0.75rem; margin-top: 0.5rem;">${dest.description}</p>
+            <p>${stars} (Ages ${dest.ageRange || 'All ages'})</p>
+            <p style="font-size: 0.75rem; margin-top: 0.5rem;">${description}</p>
             ${dest.tips ? `<p style="font-size: 0.75rem; color: #6366f1; margin-top: 0.5rem;">💡 ${dest.tips}</p>` : ''}
         </div>
     `;
@@ -488,7 +490,7 @@ function highlightDestination(id) {
 }
 
 function panToDestination(id) {
-    const dest = DESTINATIONS.find(d => d.id === id);
+    const dest = state.currentDestinations.find(d => d.id === id);
     if (dest) {
         state.map.setView([dest.lat, dest.lng], 12, {
             animate: true,
@@ -507,6 +509,10 @@ async function performSearch() {
         return;
     }
 
+    if (state.isLoading) return;
+    state.isLoading = true;
+    showLoading(true);
+
     try {
         // Calculate isochrone
         const isochroneFeature = await calculateIsochrone(
@@ -514,15 +520,45 @@ async function performSearch() {
             state.driveTimeMinutes
         );
 
+        // Store for later filtering
+        state.isochroneFeature = isochroneFeature;
+
         // Display isochrone on map
         displayIsochrone(isochroneFeature);
 
-        // Find and display destinations within isochrone
-        displayDestinations(isochroneFeature);
+        // Calculate search radius in km (approximate from drive time)
+        const timeHours = state.driveTimeMinutes / 60;
+        const radiusKm = CONFIG.averageDrivingSpeed * timeHours * 1.60934;
+
+        // Fetch destinations from API
+        console.log(`Fetching destinations within ${radiusKm.toFixed(0)}km...`);
+        const destinations = await DestinationAPI.fetchDestinations(
+            state.userLocation,
+            Math.min(radiusKm, 150), // Cap at 150km for API limits
+            state.activeFilters
+        );
+
+        console.log(`Found ${destinations.length} destinations from API`);
+
+        // Store fetched destinations
+        state.currentDestinations = destinations;
+
+        // Display destinations within isochrone
+        displayDestinations(isochroneFeature, destinations);
 
     } catch (error) {
         console.error('Search error:', error);
         updateLocationStatus('Search failed. Please try again.', 'error');
+
+        // Try with fallback destinations
+        if (typeof FALLBACK_DESTINATIONS !== 'undefined') {
+            console.log('Using fallback destinations');
+            state.currentDestinations = FALLBACK_DESTINATIONS;
+            displayDestinations(state.isochroneFeature, FALLBACK_DESTINATIONS);
+        }
+    } finally {
+        state.isLoading = false;
+        showLoading(false);
     }
 }
 
@@ -613,8 +649,11 @@ function setupEventListeners() {
                 state.activeFilters.delete(type);
             }
 
-            // Re-run search if we have an isochrone
-            if (state.isochroneLayer) {
+            // Re-filter existing destinations (no need to re-fetch)
+            if (state.isochroneFeature && state.currentDestinations.length > 0) {
+                displayDestinations(state.isochroneFeature, state.currentDestinations);
+            } else if (state.isochroneLayer) {
+                // If we have no destinations yet, do a full search
                 performSearch();
             }
         });
@@ -637,28 +676,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize time display
     updateTimeDisplay(document.getElementById('time-slider').value);
 
-    // Add initial destination markers (without filtering by isochrone)
-    displayAllDestinationsAsPreview();
-
     console.log('Family Trip Finder ready!');
+    console.log('Destinations will be fetched from OpenTripMap API when you search.');
 });
-
-function displayAllDestinationsAsPreview() {
-    // Show all destinations as faded markers initially
-    DESTINATIONS.forEach(dest => {
-        const typeInfo = DESTINATION_TYPES[dest.type];
-        const icon = L.divIcon({
-            className: 'custom-marker destination-marker preview',
-            html: `<div class="marker-pin" style="border-color: ${typeInfo.color}; opacity: 0.4"><span>${dest.imageEmoji}</span></div>`,
-            iconSize: [36, 36],
-            iconAnchor: [18, 36],
-            popupAnchor: [0, -36]
-        });
-
-        const marker = L.marker([dest.lat, dest.lng], { icon })
-            .addTo(state.map)
-            .bindPopup(createPopupContent({ ...dest, driveTime: null }));
-
-        state.destinationMarkers.push(marker);
-    });
-}
