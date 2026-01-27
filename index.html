@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Trip Finder - Discover Destinations Within Your Drive Time</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <span class="logo-icon">🚗</span>
+                <h1>Family Trip Finder</h1>
+            </div>
+            <p class="tagline">Discover family-friendly destinations within your drive time</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Control Panel -->
+            <aside class="control-panel">
+                <div class="panel-section">
+                    <h2>Your Starting Point</h2>
+
+                    <div class="location-input-group">
+                        <button id="use-current-location" class="btn btn-primary">
+                            <span class="btn-icon">📍</span>
+                            Use My Location
+                        </button>
+
+                        <div class="divider">
+                            <span>or</span>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text"
+                                   id="address-input"
+                                   placeholder="Enter address or city..."
+                                   autocomplete="off">
+                            <button id="search-address" class="btn btn-secondary">Search</button>
+                        </div>
+
+                        <div id="location-status" class="status-message"></div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Drive Time</h2>
+
+                    <div class="time-slider-container">
+                        <div class="time-display">
+                            <span id="time-value">2</span>
+                            <span class="time-unit">hours</span>
+                        </div>
+
+                        <input type="range"
+                               id="time-slider"
+                               min="0.5"
+                               max="6"
+                               step="0.5"
+                               value="2"
+                               class="time-slider">
+
+                        <div class="slider-labels">
+                            <span>30 min</span>
+                            <span>6 hours</span>
+                        </div>
+                    </div>
+
+                    <button id="search-destinations" class="btn btn-accent btn-large">
+                        <span class="btn-icon">🔍</span>
+                        Find Destinations
+                    </button>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Filter by Type</h2>
+
+                    <div class="filter-chips">
+                        <label class="chip">
+                            <input type="checkbox" value="theme_park" checked>
+                            <span>🎢 Theme Parks</span>
+                        </label>
+                        <label class="chip">
+                            <input type="checkbox" value="beach" checked>
+                            <span>🏖️ Beaches</span>
+                        </label>
+                        <label class="chip">
+                            <input type="checkbox" value="nature" checked>
+                            <span>🌲 Nature</span>
+                        </label>
+                        <label class="chip">
+                            <input type="checkbox" value="museum" checked>
+                            <span>🏛️ Museums</span>
+                        </label>
+                        <label class="chip">
+                            <input type="checkbox" value="zoo" checked>
+                            <span>🦁 Zoos</span>
+                        </label>
+                        <label class="chip">
+                            <input type="checkbox" value="historic" checked>
+                            <span>🏰 Historic Sites</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Results List -->
+                <div class="panel-section results-section">
+                    <h2>Destinations Found <span id="results-count">(0)</span></h2>
+                    <div id="results-list" class="results-list">
+                        <p class="empty-state">Set your location and drive time to discover destinations!</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Map Container -->
+            <div class="map-wrapper">
+                <div id="map"></div>
+
+                <!-- Map Legend -->
+                <div class="map-legend">
+                    <h4>Legend</h4>
+                    <div class="legend-item">
+                        <span class="legend-color reachable"></span>
+                        <span>Reachable Area</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-marker">📍</span>
+                        <span>Your Location</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-marker">⭐</span>
+                        <span>Destination</span>
+                    </div>
+                </div>
+
+                <!-- Loading Overlay -->
+                <div id="loading-overlay" class="loading-overlay hidden">
+                    <div class="loading-spinner"></div>
+                    <p>Calculating drive times...</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Built for families who love road trips 💜</p>
+        </footer>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <!-- Application Scripts -->
+    <script src="js/destinations.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
