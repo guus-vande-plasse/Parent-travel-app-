@@ -56,7 +56,9 @@ const state = {
     favorites: new Set(), // Store favorite destination IDs
     showFavoritesOnly: false,
     sortBy: 'drive_time', // drive_time, rating, name
-    expandedCard: null // Track which card is expanded
+    expandedCard: null, // Track which card is expanded
+    recentLocations: [], // Recent search locations
+    tripPlan: [] // Destinations added to trip
 };
 
 // =============================================================================
@@ -102,6 +104,333 @@ function updateFavoriteButtons() {
         btn.classList.toggle('favorited', state.favorites.has(id));
         btn.innerHTML = state.favorites.has(id) ? '❤️' : '🤍';
     });
+}
+
+// =============================================================================
+// Recent Locations (localStorage)
+// =============================================================================
+
+function loadRecentLocations() {
+    try {
+        const stored = localStorage.getItem('familyTripFinder_recentLocations');
+        if (stored) {
+            state.recentLocations = JSON.parse(stored);
+            updateRecentLocationsDatalist();
+        }
+    } catch (e) {
+        console.warn('Could not load recent locations:', e);
+    }
+}
+
+function saveRecentLocation(location, displayName) {
+    // Add to front, remove duplicates, keep max 5
+    const newLocation = {
+        lat: location.lat,
+        lng: location.lng,
+        name: displayName.split(',')[0], // Short name
+        fullName: displayName
+    };
+
+    state.recentLocations = state.recentLocations.filter(
+        loc => loc.lat !== location.lat || loc.lng !== location.lng
+    );
+    state.recentLocations.unshift(newLocation);
+    state.recentLocations = state.recentLocations.slice(0, 5);
+
+    try {
+        localStorage.setItem('familyTripFinder_recentLocations', JSON.stringify(state.recentLocations));
+    } catch (e) {
+        console.warn('Could not save recent locations:', e);
+    }
+
+    updateRecentLocationsDatalist();
+}
+
+function updateRecentLocationsDatalist() {
+    const datalist = document.getElementById('recent-locations');
+    if (!datalist) return;
+
+    datalist.innerHTML = state.recentLocations.map(loc =>
+        `<option value="${loc.fullName}">`
+    ).join('');
+}
+
+// =============================================================================
+// Trip Planner (localStorage)
+// =============================================================================
+
+function loadTripPlan() {
+    try {
+        const stored = localStorage.getItem('familyTripFinder_tripPlan');
+        if (stored) {
+            state.tripPlan = JSON.parse(stored);
+            updateTripPlanUI();
+        }
+    } catch (e) {
+        console.warn('Could not load trip plan:', e);
+    }
+}
+
+function saveTripPlan() {
+    try {
+        localStorage.setItem('familyTripFinder_tripPlan', JSON.stringify(state.tripPlan));
+    } catch (e) {
+        console.warn('Could not save trip plan:', e);
+    }
+}
+
+function addToTrip(destination) {
+    // Check if already in trip
+    if (state.tripPlan.some(d => d.id === destination.id)) {
+        showToast('Already in your trip!');
+        return;
+    }
+
+    state.tripPlan.push({
+        id: destination.id,
+        name: destination.name,
+        lat: destination.lat,
+        lng: destination.lng,
+        driveTime: destination.driveTime,
+        imageEmoji: destination.imageEmoji
+    });
+
+    saveTripPlan();
+    updateTripPlanUI();
+    updateAddToTripButtons();
+    showToast(`Added ${destination.name} to trip!`);
+}
+
+function removeFromTrip(id) {
+    state.tripPlan = state.tripPlan.filter(d => d.id !== id);
+    saveTripPlan();
+    updateTripPlanUI();
+    updateAddToTripButtons();
+}
+
+function clearTrip() {
+    if (state.tripPlan.length === 0) return;
+    if (confirm('Clear all destinations from your trip?')) {
+        state.tripPlan = [];
+        saveTripPlan();
+        updateTripPlanUI();
+        updateAddToTripButtons();
+        showToast('Trip cleared');
+    }
+}
+
+function updateTripPlanUI() {
+    const listEl = document.getElementById('trip-list');
+    const countEl = document.getElementById('trip-count');
+    const summaryEl = document.getElementById('trip-summary');
+    const shareBtn = document.getElementById('share-trip');
+    const clearBtn = document.getElementById('clear-trip');
+
+    if (!listEl) return;
+
+    countEl.textContent = `(${state.tripPlan.length})`;
+
+    // Enable/disable action buttons
+    const hasTrip = state.tripPlan.length > 0;
+    if (shareBtn) shareBtn.disabled = !hasTrip;
+    if (clearBtn) clearBtn.disabled = !hasTrip;
+
+    if (state.tripPlan.length === 0) {
+        listEl.innerHTML = '<p class="empty-state">Add destinations to plan your trip!</p>';
+        summaryEl?.classList.add('hidden');
+        return;
+    }
+
+    listEl.innerHTML = state.tripPlan.map((dest, index) => `
+        <div class="trip-item" data-id="${dest.id}">
+            <span class="trip-item-number">${index + 1}</span>
+            <div class="trip-item-info">
+                <div class="trip-item-name">${dest.imageEmoji} ${dest.name}</div>
+                <div class="trip-item-time">${dest.driveTime ? formatDriveTime(dest.driveTime) : ''}</div>
+            </div>
+            <button class="trip-item-remove" data-id="${dest.id}" title="Remove">✕</button>
+        </div>
+    `).join('');
+
+    // Add remove handlers
+    listEl.querySelectorAll('.trip-item-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeFromTrip(btn.dataset.id);
+        });
+    });
+
+    // Update summary
+    if (summaryEl) {
+        summaryEl.classList.remove('hidden');
+        const totalTime = state.tripPlan.reduce((sum, d) => sum + (d.driveTime || 0), 0);
+        const totalDistance = calculateTotalTripDistance();
+
+        document.getElementById('trip-total-time').textContent = formatDriveTime(totalTime);
+        document.getElementById('trip-total-distance').textContent = `${Math.round(totalDistance)} mi`;
+        document.getElementById('trip-stops').textContent = state.tripPlan.length;
+    }
+}
+
+function calculateTotalTripDistance() {
+    if (!state.userLocation || state.tripPlan.length === 0) return 0;
+
+    let total = 0;
+    let prevLocation = state.userLocation;
+
+    state.tripPlan.forEach(dest => {
+        total += calculateDistance(prevLocation, { lat: dest.lat, lng: dest.lng });
+        prevLocation = { lat: dest.lat, lng: dest.lng };
+    });
+
+    return total;
+}
+
+function updateAddToTripButtons() {
+    document.querySelectorAll('.btn-add-trip').forEach(btn => {
+        const id = btn.dataset.id;
+        const inTrip = state.tripPlan.some(d => d.id === id);
+        btn.classList.toggle('added', inTrip);
+        btn.textContent = inTrip ? '✓ In Trip' : '+ Add to Trip';
+    });
+}
+
+// =============================================================================
+// Distance Calculation
+// =============================================================================
+
+function calculateDistance(from, to) {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (to.lat - from.lat) * Math.PI / 180;
+    const dLng = (to.lng - from.lng) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(from.lat * Math.PI / 180) * Math.cos(to.lat * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceMiles = R * c;
+
+    // Apply road factor
+    return Math.round(distanceMiles * 1.3);
+}
+
+// =============================================================================
+// Share Functionality
+// =============================================================================
+
+function showShareModal() {
+    const modal = document.getElementById('share-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function hideShareModal() {
+    const modal = document.getElementById('share-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+function generateShareText() {
+    if (state.tripPlan.length === 0) return '';
+
+    let text = '🚗 My Family Trip Plan\n\n';
+    state.tripPlan.forEach((dest, i) => {
+        text += `${i + 1}. ${dest.imageEmoji} ${dest.name}`;
+        if (dest.driveTime) {
+            text += ` (${formatDriveTime(dest.driveTime)})`;
+        }
+        text += '\n';
+    });
+
+    const totalTime = state.tripPlan.reduce((sum, d) => sum + (d.driveTime || 0), 0);
+    text += `\nTotal drive time: ${formatDriveTime(totalTime)}`;
+    text += '\n\nPlanned with Family Trip Finder';
+
+    return text;
+}
+
+async function shareViaWebShare() {
+    const text = generateShareText();
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'My Family Trip Plan',
+                text: text
+            });
+            hideShareModal();
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                showToast('Could not share');
+            }
+        }
+    } else {
+        // Fallback to copy
+        copyTripToClipboard();
+    }
+}
+
+function copyTripToClipboard() {
+    const text = generateShareText();
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Trip copied to clipboard!');
+        hideShareModal();
+    }).catch(() => {
+        showToast('Could not copy');
+    });
+}
+
+function printTrip() {
+    const text = generateShareText();
+    const printWindow = window.open('', '_blank');
+
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>My Family Trip Plan</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 2rem; max-width: 600px; margin: 0 auto; }
+                h1 { color: #6366f1; }
+                ol { padding-left: 1.5rem; }
+                li { margin-bottom: 0.5rem; }
+                .summary { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #ccc; }
+            </style>
+        </head>
+        <body>
+            <h1>🚗 My Family Trip Plan</h1>
+            <ol>
+                ${state.tripPlan.map(d => `<li><strong>${d.name}</strong>${d.driveTime ? ` - ${formatDriveTime(d.driveTime)} drive` : ''}</li>`).join('')}
+            </ol>
+            <div class="summary">
+                <p><strong>Total stops:</strong> ${state.tripPlan.length}</p>
+                <p><strong>Total drive time:</strong> ${formatDriveTime(state.tripPlan.reduce((sum, d) => sum + (d.driveTime || 0), 0))}</p>
+            </div>
+            <p style="color: #666; font-size: 0.875rem; margin-top: 2rem;">Planned with Family Trip Finder</p>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.print();
+    hideShareModal();
+}
+
+// =============================================================================
+// Toast Notifications
+// =============================================================================
+
+function showToast(message, duration = 3000) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+
+    toast.textContent = message;
+    toast.classList.add('show');
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, duration);
 }
 
 // =============================================================================
@@ -255,6 +584,9 @@ function setUserLocation(location, displayName = 'Your Location') {
 
     // Center map on user location
     state.map.setView([location.lat, location.lng], 10);
+
+    // Save to recent locations
+    saveRecentLocation(location, displayName);
 
     updateLocationStatus(`Location set: ${displayName.split(',')[0]}`, 'success');
 }
@@ -533,6 +865,10 @@ function updateResultsList(destinations) {
         const isFav = state.favorites.has(dest.id);
         const isExpanded = state.expandedCard === dest.id;
         const cityDisplay = dest.city || 'Nearby';
+        const inTrip = state.tripPlan.some(d => d.id === dest.id);
+        const distance = state.userLocation
+            ? calculateDistance(state.userLocation, { lat: dest.lat, lng: dest.lng })
+            : null;
 
         return `
             <div class="result-card ${isExpanded ? 'expanded' : ''}" data-id="${dest.id}">
@@ -548,6 +884,7 @@ function updateResultsList(destinations) {
                 </div>
                 <div class="result-card-meta">
                     <span class="result-card-drive-time">🚗 ${driveTimeStr}</span>
+                    ${distance ? `<span class="result-card-distance">📍 ${distance} mi</span>` : ''}
                     <span class="result-card-rating">${stars}</span>
                 </div>
                 <div class="result-card-details" data-xid="${dest.xid || ''}">
@@ -555,6 +892,9 @@ function updateResultsList(destinations) {
                     <div class="result-card-actions">
                         <button class="btn btn-primary btn-directions" data-lat="${dest.lat}" data-lng="${dest.lng}">
                             🗺️ Directions
+                        </button>
+                        <button class="btn btn-add-trip ${inTrip ? 'added' : ''}" data-id="${dest.id}">
+                            ${inTrip ? '✓ In Trip' : '+ Add to Trip'}
                         </button>
                     </div>
                 </div>
@@ -595,6 +935,22 @@ function updateResultsList(destinations) {
             const lat = btn.dataset.lat;
             const lng = btn.dataset.lng;
             openDirections(lat, lng);
+        });
+    });
+
+    // Add click handlers for "Add to Trip" buttons
+    listEl.querySelectorAll('.btn-add-trip').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            const dest = state.reachableDestinations.find(d => d.id === id);
+            if (dest) {
+                if (state.tripPlan.some(d => d.id === id)) {
+                    removeFromTrip(id);
+                } else {
+                    addToTrip(dest);
+                }
+            }
         });
     });
 }
@@ -910,6 +1266,49 @@ function setupEventListeners() {
             }
         }, { passive: true });
     }
+
+    // Trip planner buttons
+    const shareTripBtn = document.getElementById('share-trip');
+    const clearTripBtn = document.getElementById('clear-trip');
+
+    if (shareTripBtn) {
+        shareTripBtn.addEventListener('click', showShareModal);
+    }
+
+    if (clearTripBtn) {
+        clearTripBtn.addEventListener('click', clearTrip);
+    }
+
+    // Share modal
+    const closeShareModal = document.getElementById('close-share-modal');
+    const shareModal = document.getElementById('share-modal');
+    const shareCopyLink = document.getElementById('share-copy-link');
+    const shareNative = document.getElementById('share-native');
+    const sharePrint = document.getElementById('share-print');
+
+    if (closeShareModal) {
+        closeShareModal.addEventListener('click', hideShareModal);
+    }
+
+    if (shareModal) {
+        shareModal.addEventListener('click', (e) => {
+            if (e.target === shareModal) {
+                hideShareModal();
+            }
+        });
+    }
+
+    if (shareCopyLink) {
+        shareCopyLink.addEventListener('click', copyTripToClipboard);
+    }
+
+    if (shareNative) {
+        shareNative.addEventListener('click', shareViaWebShare);
+    }
+
+    if (sharePrint) {
+        sharePrint.addEventListener('click', printTrip);
+    }
 }
 
 // =============================================================================
@@ -919,8 +1318,10 @@ function setupEventListeners() {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Family Trip Finder initializing...');
 
-    // Load favorites from localStorage
+    // Load data from localStorage
     loadFavorites();
+    loadRecentLocations();
+    loadTripPlan();
 
     // Initialize map
     initializeMap();
@@ -933,5 +1334,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('Family Trip Finder ready!');
     console.log('Destinations will be fetched from OpenTripMap API when you search.');
-    console.log(`Loaded ${state.favorites.size} saved favorites.`);
+    console.log(`Loaded ${state.favorites.size} favorites, ${state.recentLocations.length} recent locations, ${state.tripPlan.length} trip items.`);
 });

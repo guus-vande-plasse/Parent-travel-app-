@@ -50,7 +50,9 @@
                             <input type="text"
                                    id="address-input"
                                    placeholder="Enter address or city..."
-                                   autocomplete="off">
+                                   autocomplete="off"
+                                   list="recent-locations">
+                            <datalist id="recent-locations"></datalist>
                             <button id="search-address" class="btn btn-secondary">Search</button>
                         </div>
 
@@ -118,6 +120,38 @@
                     </div>
                 </div>
 
+                <!-- Trip Planner -->
+                <div class="panel-section trip-planner-section">
+                    <div class="trip-planner-header">
+                        <h2>My Trip <span id="trip-count">(0)</span></h2>
+                        <div class="trip-actions">
+                            <button id="share-trip" class="btn-icon-only" title="Share Trip" disabled>
+                                <span>📤</span>
+                            </button>
+                            <button id="clear-trip" class="btn-icon-only" title="Clear Trip" disabled>
+                                <span>🗑️</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="trip-list" class="trip-list">
+                        <p class="empty-state">Add destinations to plan your trip!</p>
+                    </div>
+                    <div id="trip-summary" class="trip-summary hidden">
+                        <div class="trip-stat">
+                            <span class="stat-value" id="trip-total-time">0h</span>
+                            <span class="stat-label">Total Drive</span>
+                        </div>
+                        <div class="trip-stat">
+                            <span class="stat-value" id="trip-total-distance">0 mi</span>
+                            <span class="stat-label">Distance</span>
+                        </div>
+                        <div class="trip-stat">
+                            <span class="stat-value" id="trip-stops">0</span>
+                            <span class="stat-label">Stops</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Results List -->
                 <div class="panel-section results-section">
                     <div class="results-header">
@@ -178,6 +212,33 @@
         <footer class="app-footer">
             <p>Built for families who love road trips 💜</p>
         </footer>
+
+        <!-- Share Modal -->
+        <div id="share-modal" class="share-modal hidden">
+            <div class="share-modal-content">
+                <div class="share-modal-header">
+                    <h3>Share Trip</h3>
+                    <button class="share-modal-close" id="close-share-modal">&times;</button>
+                </div>
+                <div class="share-options">
+                    <button class="share-option" id="share-copy-link">
+                        <span class="share-option-icon">🔗</span>
+                        <span>Copy Link</span>
+                    </button>
+                    <button class="share-option" id="share-native">
+                        <span class="share-option-icon">📤</span>
+                        <span>Share via...</span>
+                    </button>
+                    <button class="share-option" id="share-print">
+                        <span class="share-option-icon">🖨️</span>
+                        <span>Print Trip</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast"></div>
     </div>
 
     <!-- Leaflet JS -->

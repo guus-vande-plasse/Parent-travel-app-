@@ -599,6 +599,254 @@ body {
     transform: rotate(180deg);
 }
 
+/* Trip Planner Section */
+.trip-planner-section {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.trip-planner-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.trip-planner-header h2 {
+    margin-bottom: 0;
+}
+
+.trip-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.trip-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.trip-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--card-bg);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.trip-item-number {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.trip-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.trip-item-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.trip-item-time {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+}
+
+.trip-item-remove {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: var(--transition);
+    font-size: 0.75rem;
+}
+
+.trip-item-remove:hover {
+    opacity: 1;
+    color: var(--error-color);
+}
+
+.trip-summary {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.75rem;
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    margin-top: 0.75rem;
+}
+
+.trip-summary.hidden {
+    display: none;
+}
+
+.trip-stat {
+    text-align: center;
+}
+
+.trip-stat .stat-value {
+    display: block;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.trip-stat .stat-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+/* Add to Trip Button */
+.btn-add-trip {
+    background: var(--accent-color);
+    color: white;
+}
+
+.btn-add-trip:hover {
+    background: var(--accent-dark);
+}
+
+.btn-add-trip.added {
+    background: var(--success-color);
+}
+
+/* Share Modal */
+.share-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 1rem;
+}
+
+.share-modal.hidden {
+    display: none;
+}
+
+.share-modal-content {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: var(--shadow-lg);
+}
+
+.share-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.share-modal-header h3 {
+    font-size: 1.125rem;
+    margin: 0;
+}
+
+.share-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.share-modal-close:hover {
+    opacity: 1;
+}
+
+.share-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.share-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    text-align: left;
+}
+
+.share-option:hover {
+    border-color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.share-option-icon {
+    font-size: 1.25rem;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--text-primary);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-lg);
+    z-index: 3000;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Distance Badge */
+.result-card-distance {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    color: var(--text-light);
+    background: var(--bg-color);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+}
+
 /* Map Wrapper */
 .map-wrapper {
     flex: 1;
