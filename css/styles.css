@@ -365,10 +365,67 @@ body {
     min-height: 200px;
 }
 
-.results-section h2 {
+.results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    gap: 0.5rem;
+}
+
+.results-header h2 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-bottom: 0;
+}
+
+.results-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-icon-only {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 1rem;
+}
+
+.btn-icon-only:hover {
+    border-color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.btn-icon-only.active {
+    background: #fee2e2;
+    border-color: #ef4444;
+}
+
+.sort-select {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 600;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.sort-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
 }
 
 #results-count {
@@ -396,11 +453,11 @@ body {
     margin-bottom: 0.75rem;
     cursor: pointer;
     transition: var(--transition);
+    position: relative;
 }
 
 .result-card:hover {
     background: var(--border-color);
-    transform: translateX(4px);
 }
 
 .result-card.active {
@@ -429,6 +486,9 @@ body {
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 0.125rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .result-card-location {
@@ -456,6 +516,87 @@ body {
     display: flex;
     align-items: center;
     gap: 0.25rem;
+}
+
+/* Favorite Button */
+.favorite-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card-bg);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.875rem;
+    opacity: 0.6;
+    transition: var(--transition);
+    z-index: 2;
+}
+
+.favorite-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.favorite-btn.favorited {
+    opacity: 1;
+    color: #ef4444;
+}
+
+/* Expandable Card Details */
+.result-card-details {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.result-card.expanded .result-card-details {
+    max-height: 300px;
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.result-card-description {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+}
+
+.result-card-description.loading {
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.result-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.result-card-actions .btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+}
+
+.expand-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-light);
+    transition: var(--transition);
+}
+
+.result-card.expanded .expand-indicator {
+    transform: rotate(180deg);
 }
 
 /* Map Wrapper */
@@ -640,24 +781,92 @@ body {
     }
 }
 
+/* Mobile Panel Toggle */
+.mobile-panel-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1002;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+    transition: var(--transition);
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.mobile-panel-toggle:hover {
+    background: var(--primary-dark);
+    transform: translateX(-50%) scale(1.05);
+}
+
+.mobile-panel-toggle .toggle-icon {
+    font-size: 1rem;
+}
+
 /* Mobile */
 @media (max-width: 768px) {
     .main-content {
         flex-direction: column;
+        position: relative;
     }
 
     .control-panel {
         width: 100%;
-        max-height: none;
-        order: 2;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 60vh;
+        overflow-y: auto;
+        z-index: 1001;
         border-right: none;
         border-top: 1px solid var(--border-color);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        transform: translateY(calc(100% - 60px));
+        transition: transform 0.3s ease;
+    }
+
+    .control-panel.expanded {
+        transform: translateY(0);
+    }
+
+    .control-panel::before {
+        content: '';
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: var(--border-color);
+        border-radius: var(--radius-full);
+        margin: 0.75rem auto;
     }
 
     .map-wrapper {
-        order: 1;
-        height: 50vh;
-        min-height: 300px;
+        height: 100vh;
+        min-height: 100vh;
+    }
+
+    .mobile-panel-toggle {
+        display: flex;
+    }
+
+    .control-panel.expanded + .map-wrapper .mobile-panel-toggle,
+    .control-panel.expanded ~ .mobile-panel-toggle {
+        display: none;
+    }
+
+    body.panel-open .mobile-panel-toggle {
+        display: none;
     }
 
     .panel-section {
@@ -666,11 +875,11 @@ body {
 
     .results-section {
         min-height: 150px;
-        max-height: 300px;
+        max-height: none;
     }
 
     .map-legend {
-        bottom: 10px;
+        bottom: 80px;
         right: 10px;
         padding: 0.5rem 0.75rem;
         font-size: 0.75rem;
@@ -683,6 +892,14 @@ body {
     .chip span {
         padding: 0.375rem 0.625rem;
         font-size: 0.75rem;
+    }
+
+    .results-header {
+        flex-wrap: wrap;
+    }
+
+    .app-footer {
+        display: none;
     }
 }
 

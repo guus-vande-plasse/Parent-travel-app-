@@ -48,11 +48,81 @@ const state = {
     isochroneFeature: null, // Store for filtering
     destinationMarkers: [],
     currentDestinations: [], // Store fetched destinations
+    reachableDestinations: [], // Store filtered reachable destinations
     selectedDestination: null,
     driveTimeMinutes: 120, // Default 2 hours
     activeFilters: new Set(['theme_park', 'beach', 'nature', 'museum', 'zoo', 'historic']),
-    isLoading: false
+    isLoading: false,
+    favorites: new Set(), // Store favorite destination IDs
+    showFavoritesOnly: false,
+    sortBy: 'drive_time', // drive_time, rating, name
+    expandedCard: null // Track which card is expanded
 };
+
+// =============================================================================
+// Favorites Management (localStorage)
+// =============================================================================
+
+function loadFavorites() {
+    try {
+        const stored = localStorage.getItem('familyTripFinder_favorites');
+        if (stored) {
+            state.favorites = new Set(JSON.parse(stored));
+        }
+    } catch (e) {
+        console.warn('Could not load favorites from localStorage:', e);
+    }
+}
+
+function saveFavorites() {
+    try {
+        localStorage.setItem('familyTripFinder_favorites', JSON.stringify([...state.favorites]));
+    } catch (e) {
+        console.warn('Could not save favorites to localStorage:', e);
+    }
+}
+
+function toggleFavorite(id) {
+    if (state.favorites.has(id)) {
+        state.favorites.delete(id);
+    } else {
+        state.favorites.add(id);
+    }
+    saveFavorites();
+    updateFavoriteButtons();
+}
+
+function isFavorite(id) {
+    return state.favorites.has(id);
+}
+
+function updateFavoriteButtons() {
+    document.querySelectorAll('.favorite-btn').forEach(btn => {
+        const id = btn.dataset.id;
+        btn.classList.toggle('favorited', state.favorites.has(id));
+        btn.innerHTML = state.favorites.has(id) ? '❤️' : '🤍';
+    });
+}
+
+// =============================================================================
+// Sorting
+// =============================================================================
+
+function sortDestinations(destinations, sortBy) {
+    const sorted = [...destinations];
+    switch (sortBy) {
+        case 'drive_time':
+            sorted.sort((a, b) => (a.driveTime || 999) - (b.driveTime || 999));
+            break;
+        case 'rating':
+            sorted.sort((a, b) => (b.kidFriendlyRating || 0) - (a.kidFriendlyRating || 0));
+            break;
+        case 'name':
+            sorted.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+    }
+    return sorted;
+}
 
 // =============================================================================
 // Map Initialization
@@ -368,11 +438,19 @@ function displayDestinations(isochroneFeature, destinations = []) {
         }
     });
 
-    // Sort by drive time
-    reachableDestinations.sort((a, b) => a.driveTime - b.driveTime);
+    // Store for later use (sorting, favorites toggle)
+    state.reachableDestinations = reachableDestinations;
+
+    // Apply sorting
+    const sortedDestinations = sortDestinations(reachableDestinations, state.sortBy);
+
+    // Filter by favorites if enabled
+    const displayDestinations = state.showFavoritesOnly
+        ? sortedDestinations.filter(d => state.favorites.has(d.id))
+        : sortedDestinations;
 
     // Add markers for reachable destinations
-    reachableDestinations.forEach(dest => {
+    displayDestinations.forEach(dest => {
         const typeInfo = DESTINATION_TYPES[dest.type];
         const icon = L.divIcon({
             className: 'custom-marker destination-marker',
@@ -396,7 +474,7 @@ function displayDestinations(isochroneFeature, destinations = []) {
     });
 
     // Update results list
-    updateResultsList(reachableDestinations);
+    updateResultsList(displayDestinations);
 }
 
 function createPopupContent(dest) {
@@ -434,43 +512,166 @@ function updateResultsList(destinations) {
     const listEl = document.getElementById('results-list');
     const countEl = document.getElementById('results-count');
 
-    countEl.textContent = `(${destinations.length})`;
+    const totalCount = state.reachableDestinations?.length || destinations.length;
+    const favCount = state.showFavoritesOnly ? destinations.length : '';
+    countEl.textContent = state.showFavoritesOnly
+        ? `(${favCount} favorites)`
+        : `(${totalCount})`;
 
     if (destinations.length === 0) {
-        listEl.innerHTML = '<p class="empty-state">No destinations found within your drive time. Try increasing the time or changing filters.</p>';
+        const message = state.showFavoritesOnly
+            ? 'No favorites yet. Click the heart icon on destinations to save them!'
+            : 'No destinations found within your drive time. Try increasing the time or changing filters.';
+        listEl.innerHTML = `<p class="empty-state">${message}</p>`;
         return;
     }
 
     listEl.innerHTML = destinations.map(dest => {
         const typeInfo = DESTINATION_TYPES[dest.type];
         const driveTimeStr = formatDriveTime(dest.driveTime);
-        const stars = '⭐'.repeat(Math.min(dest.kidFriendlyRating, 5));
+        const stars = '⭐'.repeat(Math.min(dest.kidFriendlyRating || 3, 5));
+        const isFav = state.favorites.has(dest.id);
+        const isExpanded = state.expandedCard === dest.id;
+        const cityDisplay = dest.city || 'Nearby';
 
         return `
-            <div class="result-card" data-id="${dest.id}">
+            <div class="result-card ${isExpanded ? 'expanded' : ''}" data-id="${dest.id}">
+                <button class="favorite-btn ${isFav ? 'favorited' : ''}" data-id="${dest.id}" title="Save to favorites">
+                    ${isFav ? '❤️' : '🤍'}
+                </button>
                 <div class="result-card-header">
                     <span class="result-card-icon">${dest.imageEmoji}</span>
                     <div class="result-card-info">
                         <div class="result-card-title">${dest.name}</div>
-                        <div class="result-card-location">${dest.city}</div>
+                        <div class="result-card-location">${cityDisplay}</div>
                     </div>
                 </div>
                 <div class="result-card-meta">
                     <span class="result-card-drive-time">🚗 ${driveTimeStr}</span>
                     <span class="result-card-rating">${stars}</span>
                 </div>
+                <div class="result-card-details" data-xid="${dest.xid || ''}">
+                    <p class="result-card-description loading">Loading details...</p>
+                    <div class="result-card-actions">
+                        <button class="btn btn-primary btn-directions" data-lat="${dest.lat}" data-lng="${dest.lng}">
+                            🗺️ Directions
+                        </button>
+                    </div>
+                </div>
+                <div class="expand-indicator">▼</div>
             </div>
         `;
     }).join('');
 
-    // Add click handlers
+    // Add click handlers for cards
     listEl.querySelectorAll('.result-card').forEach(card => {
-        card.addEventListener('click', () => {
+        // Main card click - expand/collapse and show on map
+        card.addEventListener('click', (e) => {
+            // Ignore if clicking favorite button or action buttons
+            if (e.target.closest('.favorite-btn') || e.target.closest('.result-card-actions')) {
+                return;
+            }
+
             const id = card.dataset.id;
+            toggleCardExpansion(id, card);
             highlightDestination(id);
             panToDestination(id);
         });
     });
+
+    // Add click handlers for favorite buttons
+    listEl.querySelectorAll('.favorite-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            toggleFavorite(id);
+        });
+    });
+
+    // Add click handlers for directions buttons
+    listEl.querySelectorAll('.btn-directions').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const lat = btn.dataset.lat;
+            const lng = btn.dataset.lng;
+            openDirections(lat, lng);
+        });
+    });
+}
+
+function toggleCardExpansion(id, cardElement) {
+    const wasExpanded = state.expandedCard === id;
+
+    // Collapse previously expanded card
+    if (state.expandedCard && state.expandedCard !== id) {
+        const prevCard = document.querySelector(`.result-card[data-id="${state.expandedCard}"]`);
+        if (prevCard) {
+            prevCard.classList.remove('expanded');
+        }
+    }
+
+    if (wasExpanded) {
+        // Collapse this card
+        state.expandedCard = null;
+        cardElement.classList.remove('expanded');
+    } else {
+        // Expand this card
+        state.expandedCard = id;
+        cardElement.classList.add('expanded');
+
+        // Fetch details if we have an xid
+        const detailsEl = cardElement.querySelector('.result-card-details');
+        const xid = detailsEl?.dataset.xid;
+        if (xid && typeof DestinationAPI !== 'undefined') {
+            fetchAndDisplayDetails(xid, detailsEl);
+        } else {
+            // No xid, show basic description from destination data
+            const dest = state.reachableDestinations.find(d => d.id === id);
+            const descEl = detailsEl?.querySelector('.result-card-description');
+            if (descEl && dest) {
+                descEl.textContent = dest.description || 'No additional details available.';
+                descEl.classList.remove('loading');
+            }
+        }
+    }
+}
+
+async function fetchAndDisplayDetails(xid, detailsEl) {
+    const descEl = detailsEl.querySelector('.result-card-description');
+    if (!descEl) return;
+
+    try {
+        const details = await DestinationAPI.fetchDestinationDetails(xid);
+        if (details && details.description) {
+            descEl.textContent = details.description;
+        } else {
+            descEl.textContent = 'No additional details available.';
+        }
+    } catch (error) {
+        descEl.textContent = 'Could not load details.';
+    }
+    descEl.classList.remove('loading');
+}
+
+function openDirections(lat, lng) {
+    // Open Google Maps directions from user location
+    const from = state.userLocation
+        ? `${state.userLocation.lat},${state.userLocation.lng}`
+        : '';
+    const to = `${lat},${lng}`;
+    const url = `https://www.google.com/maps/dir/${from}/${to}`;
+    window.open(url, '_blank');
+}
+
+function refreshResultsList() {
+    // Re-display with current sorting and filtering
+    if (state.isochroneFeature && state.reachableDestinations.length > 0) {
+        const sortedDestinations = sortDestinations(state.reachableDestinations, state.sortBy);
+        const displayDests = state.showFavoritesOnly
+            ? sortedDestinations.filter(d => state.favorites.has(d.id))
+            : sortedDestinations;
+        updateResultsList(displayDests);
+    }
 }
 
 function highlightDestination(id) {
@@ -658,6 +859,57 @@ function setupEventListeners() {
             }
         });
     });
+
+    // Sort select
+    const sortSelect = document.getElementById('sort-select');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+            state.sortBy = e.target.value;
+            refreshResultsList();
+        });
+    }
+
+    // Favorites toggle
+    const favToggle = document.getElementById('toggle-favorites');
+    if (favToggle) {
+        favToggle.addEventListener('click', () => {
+            state.showFavoritesOnly = !state.showFavoritesOnly;
+            favToggle.classList.toggle('active', state.showFavoritesOnly);
+            favToggle.title = state.showFavoritesOnly ? 'Show All' : 'Show Favorites';
+            refreshResultsList();
+        });
+    }
+
+    // Mobile panel toggle
+    const mobileToggle = document.getElementById('mobile-panel-toggle');
+    const controlPanel = document.querySelector('.control-panel');
+
+    if (mobileToggle && controlPanel) {
+        mobileToggle.addEventListener('click', () => {
+            controlPanel.classList.toggle('expanded');
+            document.body.classList.toggle('panel-open');
+            const isExpanded = controlPanel.classList.contains('expanded');
+            mobileToggle.querySelector('.toggle-text').textContent = isExpanded ? 'Hide Panel' : 'Show Results';
+        });
+
+        // Allow swiping down to close panel on mobile
+        let touchStartY = 0;
+        controlPanel.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        controlPanel.addEventListener('touchmove', (e) => {
+            const touchY = e.touches[0].clientY;
+            const diff = touchY - touchStartY;
+
+            // If swiping down significantly, collapse the panel
+            if (diff > 100 && controlPanel.classList.contains('expanded')) {
+                controlPanel.classList.remove('expanded');
+                document.body.classList.remove('panel-open');
+                mobileToggle.querySelector('.toggle-text').textContent = 'Show Results';
+            }
+        }, { passive: true });
+    }
 }
 
 // =============================================================================
@@ -666,6 +918,9 @@ function setupEventListeners() {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Family Trip Finder initializing...');
+
+    // Load favorites from localStorage
+    loadFavorites();
 
     // Initialize map
     initializeMap();
@@ -678,4 +933,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('Family Trip Finder ready!');
     console.log('Destinations will be fetched from OpenTripMap API when you search.');
+    console.log(`Loaded ${state.favorites.size} saved favorites.`);
 });

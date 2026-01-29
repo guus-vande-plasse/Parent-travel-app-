@@ -120,12 +120,30 @@
 
                 <!-- Results List -->
                 <div class="panel-section results-section">
-                    <h2>Destinations Found <span id="results-count">(0)</span></h2>
+                    <div class="results-header">
+                        <h2>Destinations <span id="results-count">(0)</span></h2>
+                        <div class="results-controls">
+                            <button id="toggle-favorites" class="btn-icon-only" title="Show Favorites">
+                                <span>❤️</span>
+                            </button>
+                            <select id="sort-select" class="sort-select">
+                                <option value="drive_time">Sort: Drive Time</option>
+                                <option value="rating">Sort: Rating</option>
+                                <option value="name">Sort: Name</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="results-list" class="results-list">
                         <p class="empty-state">Set your location and drive time to discover destinations!</p>
                     </div>
                 </div>
             </aside>
+
+            <!-- Mobile Panel Toggle -->
+            <button id="mobile-panel-toggle" class="mobile-panel-toggle">
+                <span class="toggle-icon">📋</span>
+                <span class="toggle-text">Show Results</span>
+            </button>
 
             <!-- Map Container -->
             <div class="map-wrapper">
