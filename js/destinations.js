@@ -62,6 +62,22 @@ const CATEGORY_MAPPING = {
         icon: '🏰',
         color: '#6366f1',
         defaultEmoji: '🏰'
+    },
+    hotel: {
+        kinds: 'accomodations,hotels,resorts,guest_houses,hostels',
+        label: 'Family Hotel',
+        icon: '🏨',
+        color: '#ec4899',
+        defaultEmoji: '🏨',
+        kidFriendly: true
+    },
+    camping: {
+        kinds: 'campsites,camping,caravan_site,alpine_hut',
+        label: 'Camping',
+        icon: '🏕️',
+        color: '#84cc16',
+        defaultEmoji: '🏕️',
+        kidFriendly: true
     }
 };
 
@@ -122,7 +138,17 @@ const KIND_EMOJIS = {
     'castles': '🏰',
     'fortifications': '🏯',
     'archaeological_sites': '🏺',
-    'lighthouses': '🗼'
+    'lighthouses': '🗼',
+    // Accommodations
+    'accomodations': '🏨',
+    'hotels': '🏨',
+    'resorts': '🌴',
+    'guest_houses': '🏠',
+    'hostels': '🛏️',
+    'campsites': '🏕️',
+    'camping': '⛺',
+    'caravan_site': '🚐',
+    'alpine_hut': '🏔️'
 };
 
 // =============================================================================

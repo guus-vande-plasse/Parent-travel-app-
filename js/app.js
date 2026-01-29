@@ -58,7 +58,15 @@ const state = {
     sortBy: 'drive_time', // drive_time, rating, name
     expandedCard: null, // Track which card is expanded
     recentLocations: [], // Recent search locations
-    tripPlan: [] // Destinations added to trip
+    tripPlan: [], // Destinations added to trip
+    referral: {
+        code: null,
+        invites: 0,
+        signups: 0,
+        points: 0,
+        history: [],
+        claimedRewards: []
+    }
 };
 
 // =============================================================================
@@ -415,6 +423,281 @@ function printTrip() {
     printWindow.document.close();
     printWindow.print();
     hideShareModal();
+}
+
+// =============================================================================
+// Referral Program System
+// =============================================================================
+
+const REFERRAL_CONFIG = {
+    pointsPerSignup: 10,
+    tiers: {
+        starter: { minPoints: 0, name: 'Starter' },
+        bronze: { minPoints: 25, name: 'Bronze' },
+        silver: { minPoints: 50, name: 'Silver' },
+        gold: { minPoints: 100, name: 'Gold' },
+        platinum: { minPoints: 250, name: 'Platinum' }
+    },
+    rewards: {
+        customThemes: { cost: 25, name: 'Custom Themes' },
+        premiumFeatures: { cost: 50, name: 'Premium Features' },
+        vipStatus: { cost: 100, name: 'VIP Status' }
+    }
+};
+
+function generateReferralCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'FTF-';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+function loadReferralData() {
+    try {
+        const stored = localStorage.getItem('familyTripFinder_referral');
+        if (stored) {
+            const data = JSON.parse(stored);
+            state.referral = { ...state.referral, ...data };
+        }
+
+        // Generate code if not exists
+        if (!state.referral.code) {
+            state.referral.code = generateReferralCode();
+            saveReferralData();
+        }
+
+        updateReferralUI();
+    } catch (e) {
+        console.warn('Could not load referral data:', e);
+        state.referral.code = generateReferralCode();
+    }
+}
+
+function saveReferralData() {
+    try {
+        localStorage.setItem('familyTripFinder_referral', JSON.stringify(state.referral));
+    } catch (e) {
+        console.warn('Could not save referral data:', e);
+    }
+}
+
+function getCurrentTier() {
+    const points = state.referral.points;
+    let currentTier = REFERRAL_CONFIG.tiers.starter;
+
+    for (const tier of Object.values(REFERRAL_CONFIG.tiers)) {
+        if (points >= tier.minPoints) {
+            currentTier = tier;
+        }
+    }
+
+    return currentTier;
+}
+
+function addReferralPoints(points, reason) {
+    state.referral.points += points;
+    state.referral.history.unshift({
+        type: 'earned',
+        points: points,
+        reason: reason,
+        date: new Date().toISOString()
+    });
+
+    // Keep history to last 50 entries
+    if (state.referral.history.length > 50) {
+        state.referral.history = state.referral.history.slice(0, 50);
+    }
+
+    saveReferralData();
+    updateReferralUI();
+}
+
+function recordReferralInvite() {
+    state.referral.invites++;
+    saveReferralData();
+    updateReferralUI();
+}
+
+function recordReferralSignup() {
+    state.referral.signups++;
+    addReferralPoints(REFERRAL_CONFIG.pointsPerSignup, 'Friend signed up');
+    showToast(`+${REFERRAL_CONFIG.pointsPerSignup} points! Friend signed up!`);
+}
+
+function claimReward(rewardKey) {
+    const reward = REFERRAL_CONFIG.rewards[rewardKey];
+    if (!reward) return;
+
+    if (state.referral.points < reward.cost) {
+        showToast('Not enough points!');
+        return;
+    }
+
+    if (state.referral.claimedRewards.includes(rewardKey)) {
+        showToast('Already claimed!');
+        return;
+    }
+
+    state.referral.points -= reward.cost;
+    state.referral.claimedRewards.push(rewardKey);
+    state.referral.history.unshift({
+        type: 'redeemed',
+        points: -reward.cost,
+        reason: `Claimed ${reward.name}`,
+        date: new Date().toISOString()
+    });
+
+    saveReferralData();
+    updateReferralUI();
+    showToast(`Claimed ${reward.name}!`);
+}
+
+function updateReferralUI() {
+    // Update referral code display
+    const codeEl = document.getElementById('referral-code');
+    if (codeEl) {
+        codeEl.textContent = state.referral.code || 'Loading...';
+    }
+
+    // Update stats
+    const invitesEl = document.getElementById('referral-invites');
+    const signupsEl = document.getElementById('referral-signups');
+    const rewardsEl = document.getElementById('referral-rewards');
+
+    if (invitesEl) invitesEl.textContent = state.referral.invites;
+    if (signupsEl) signupsEl.textContent = state.referral.signups;
+    if (rewardsEl) rewardsEl.textContent = state.referral.points;
+
+    // Update modal if open
+    updateReferralModal();
+}
+
+function updateReferralModal() {
+    const totalPointsEl = document.getElementById('modal-total-points');
+    const currentTierEl = document.getElementById('modal-current-tier');
+    const historyListEl = document.getElementById('referral-history-list');
+
+    if (totalPointsEl) {
+        totalPointsEl.textContent = state.referral.points;
+    }
+
+    if (currentTierEl) {
+        currentTierEl.textContent = getCurrentTier().name;
+    }
+
+    // Update history list
+    if (historyListEl) {
+        if (state.referral.history.length === 0) {
+            historyListEl.innerHTML = '<p class="empty-state">No referral activity yet. Share your code to get started!</p>';
+        } else {
+            historyListEl.innerHTML = state.referral.history.slice(0, 10).map(item => {
+                const icon = item.type === 'earned' ? '🎉' : '🎁';
+                const pointsClass = item.type === 'earned' ? 'history-points' : '';
+                const pointsDisplay = item.points > 0 ? `+${item.points}` : item.points;
+                const date = new Date(item.date).toLocaleDateString();
+
+                return `
+                    <div class="history-item">
+                        <span class="history-icon">${icon}</span>
+                        <div class="history-details">
+                            <div class="history-title">${item.reason}</div>
+                            <div class="history-date">${date}</div>
+                        </div>
+                        <span class="${pointsClass}">${pointsDisplay}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // Update reward claim buttons
+    document.querySelectorAll('.reward-item').forEach(item => {
+        const cost = parseInt(item.dataset.cost);
+        const claimBtn = item.querySelector('.btn-claim');
+
+        if (claimBtn) {
+            const rewardKey = getRewardKeyByCost(cost);
+            const isAvailable = state.referral.points >= cost && !state.referral.claimedRewards.includes(rewardKey);
+            const isClaimed = state.referral.claimedRewards.includes(rewardKey);
+
+            claimBtn.disabled = !isAvailable;
+            claimBtn.textContent = isClaimed ? 'Claimed' : 'Claim';
+            item.classList.toggle('available', isAvailable);
+        }
+    });
+}
+
+function getRewardKeyByCost(cost) {
+    for (const [key, reward] of Object.entries(REFERRAL_CONFIG.rewards)) {
+        if (reward.cost === cost) return key;
+    }
+    return null;
+}
+
+function copyReferralCode() {
+    const code = state.referral.code;
+    const shareText = `Join me on Family Trip Finder! Use my referral code: ${code}\n\nPlan amazing family road trips: https://familytripfinder.app/?ref=${code}`;
+
+    navigator.clipboard.writeText(shareText).then(() => {
+        recordReferralInvite();
+        showToast('Referral code copied!');
+    }).catch(() => {
+        showToast('Could not copy code');
+    });
+}
+
+async function shareReferralLink() {
+    const code = state.referral.code;
+    const shareData = {
+        title: 'Join Family Trip Finder!',
+        text: `Plan amazing family road trips with me! Use my referral code: ${code}`,
+        url: `https://familytripfinder.app/?ref=${code}`
+    };
+
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+            recordReferralInvite();
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                copyReferralCode();
+            }
+        }
+    } else {
+        copyReferralCode();
+    }
+}
+
+function showReferralModal() {
+    const modal = document.getElementById('referral-modal');
+    if (modal) {
+        updateReferralModal();
+        modal.classList.remove('hidden');
+    }
+}
+
+function hideReferralModal() {
+    const modal = document.getElementById('referral-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Check for referral code in URL on load
+function checkReferralCode() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+
+    if (refCode && refCode !== state.referral.code) {
+        // Simulate signup from referral (in real app, this would be server-side)
+        const referrerData = localStorage.getItem(`familyTripFinder_referred_${refCode}`);
+        if (!referrerData) {
+            localStorage.setItem(`familyTripFinder_referred_${refCode}`, 'true');
+            showToast(`Welcome! You joined via referral code: ${refCode}`);
+        }
+    }
 }
 
 // =============================================================================
@@ -1309,6 +1592,49 @@ function setupEventListeners() {
     if (sharePrint) {
         sharePrint.addEventListener('click', printTrip);
     }
+
+    // Referral system event listeners
+    const copyReferralCodeBtn = document.getElementById('copy-referral-code');
+    const shareReferralBtn = document.getElementById('share-referral');
+    const viewHistoryBtn = document.getElementById('view-referral-history');
+    const closeReferralModalBtn = document.getElementById('close-referral-modal');
+    const referralModal = document.getElementById('referral-modal');
+
+    if (copyReferralCodeBtn) {
+        copyReferralCodeBtn.addEventListener('click', copyReferralCode);
+    }
+
+    if (shareReferralBtn) {
+        shareReferralBtn.addEventListener('click', shareReferralLink);
+    }
+
+    if (viewHistoryBtn) {
+        viewHistoryBtn.addEventListener('click', showReferralModal);
+    }
+
+    if (closeReferralModalBtn) {
+        closeReferralModalBtn.addEventListener('click', hideReferralModal);
+    }
+
+    if (referralModal) {
+        referralModal.addEventListener('click', (e) => {
+            if (e.target === referralModal) {
+                hideReferralModal();
+            }
+        });
+    }
+
+    // Reward claim buttons
+    document.querySelectorAll('.btn-claim').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const rewardItem = e.target.closest('.reward-item');
+            const cost = parseInt(rewardItem?.dataset.cost);
+            const rewardKey = getRewardKeyByCost(cost);
+            if (rewardKey) {
+                claimReward(rewardKey);
+            }
+        });
+    });
 }
 
 // =============================================================================
@@ -1322,6 +1648,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFavorites();
     loadRecentLocations();
     loadTripPlan();
+    loadReferralData();
+
+    // Check for referral code in URL
+    checkReferralCode();
 
     // Initialize map
     initializeMap();
@@ -1335,4 +1665,5 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Family Trip Finder ready!');
     console.log('Destinations will be fetched from OpenTripMap API when you search.');
     console.log(`Loaded ${state.favorites.size} favorites, ${state.recentLocations.length} recent locations, ${state.tripPlan.length} trip items.`);
+    console.log(`Referral code: ${state.referral.code}, Points: ${state.referral.points}`);
 });

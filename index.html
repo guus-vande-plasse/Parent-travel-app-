@@ -118,6 +118,18 @@
                             <span>🏰 Historic Sites</span>
                         </label>
                     </div>
+
+                    <h3 class="subsection-title">Kid-Friendly Stays</h3>
+                    <div class="filter-chips accommodation-filters">
+                        <label class="chip accommodation">
+                            <input type="checkbox" value="hotel">
+                            <span>🏨 Family Hotels</span>
+                        </label>
+                        <label class="chip accommodation">
+                            <input type="checkbox" value="camping">
+                            <span>🏕️ Campgrounds</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Trip Planner -->
@@ -148,6 +160,62 @@
                         <div class="trip-stat">
                             <span class="stat-value" id="trip-stops">0</span>
                             <span class="stat-label">Stops</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Referral Program -->
+                <div class="panel-section referral-section">
+                    <div class="referral-header">
+                        <h2>Invite Friends</h2>
+                        <span class="referral-badge">Earn Rewards</span>
+                    </div>
+                    <div class="referral-content">
+                        <p class="referral-description">Share Family Trip Finder with friends and earn rewards when they plan trips!</p>
+
+                        <div class="referral-code-box">
+                            <label>Your Referral Code</label>
+                            <div class="referral-code-display">
+                                <span id="referral-code">Loading...</span>
+                                <button id="copy-referral-code" class="btn-icon-only" title="Copy Code">
+                                    <span>📋</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="referral-stats">
+                            <div class="referral-stat">
+                                <span class="stat-value" id="referral-invites">0</span>
+                                <span class="stat-label">Invited</span>
+                            </div>
+                            <div class="referral-stat">
+                                <span class="stat-value" id="referral-signups">0</span>
+                                <span class="stat-label">Signed Up</span>
+                            </div>
+                            <div class="referral-stat">
+                                <span class="stat-value" id="referral-rewards">0</span>
+                                <span class="stat-label">Rewards</span>
+                            </div>
+                        </div>
+
+                        <div class="referral-actions">
+                            <button id="share-referral" class="btn btn-primary">
+                                <span class="btn-icon">📧</span>
+                                Share Link
+                            </button>
+                            <button id="view-referral-history" class="btn btn-secondary">
+                                <span class="btn-icon">📊</span>
+                                History
+                            </button>
+                        </div>
+
+                        <div class="referral-rewards-info">
+                            <h4>How It Works</h4>
+                            <ul class="rewards-list">
+                                <li><span class="reward-icon">🎁</span> Get 10 points per signup</li>
+                                <li><span class="reward-icon">⭐</span> 50 points = Premium features</li>
+                                <li><span class="reward-icon">🏆</span> 100 points = VIP status</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -233,6 +301,55 @@
                         <span class="share-option-icon">🖨️</span>
                         <span>Print Trip</span>
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Referral Modal -->
+        <div id="referral-modal" class="share-modal hidden">
+            <div class="share-modal-content referral-modal-content">
+                <div class="share-modal-header">
+                    <h3>Referral History</h3>
+                    <button class="share-modal-close" id="close-referral-modal">&times;</button>
+                </div>
+                <div class="referral-history-content">
+                    <div class="referral-summary-banner">
+                        <div class="summary-item">
+                            <span class="summary-value" id="modal-total-points">0</span>
+                            <span class="summary-label">Total Points</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-value" id="modal-current-tier">Starter</span>
+                            <span class="summary-label">Your Tier</span>
+                        </div>
+                    </div>
+
+                    <h4>Recent Activity</h4>
+                    <div id="referral-history-list" class="referral-history-list">
+                        <p class="empty-state">No referral activity yet. Share your code to get started!</p>
+                    </div>
+
+                    <h4>Available Rewards</h4>
+                    <div class="rewards-grid">
+                        <div class="reward-item" data-cost="50">
+                            <span class="reward-icon-large">🌟</span>
+                            <span class="reward-name">Premium Features</span>
+                            <span class="reward-cost">50 points</span>
+                            <button class="btn btn-small btn-claim" disabled>Claim</button>
+                        </div>
+                        <div class="reward-item" data-cost="100">
+                            <span class="reward-icon-large">🏆</span>
+                            <span class="reward-name">VIP Status</span>
+                            <span class="reward-cost">100 points</span>
+                            <button class="btn btn-small btn-claim" disabled>Claim</button>
+                        </div>
+                        <div class="reward-item" data-cost="25">
+                            <span class="reward-icon-large">🎨</span>
+                            <span class="reward-name">Custom Themes</span>
+                            <span class="reward-cost">25 points</span>
+                            <button class="btn btn-small btn-claim" disabled>Claim</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
